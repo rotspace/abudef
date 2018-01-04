@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 
 	"github.com/rotspace/abudef/core"
@@ -21,6 +22,8 @@ var (
 )
 
 func runBot(*cli.Context) {
+	log.SetFlags(log.Llongfile | log.LstdFlags)
+
 	var (
 		envFile = "/home/admin/web/redcastle.info/.env"
 		key     = "TELEGRAM_BOT_TOKEN"
@@ -49,5 +52,9 @@ func runBot(*cli.Context) {
 }
 
 func onMessage(currentUsername, unused string) (string, error) {
-	return fmt.Sprintf("Текущий бот: @" + currentUsername), nil
+	bts, err := ioutil.ReadFile("text.txt")
+	if err != nil {
+		return "@" + currentUsername, nil
+	}
+	return fmt.Sprintf(string(bts), currentUsername), nil
 }

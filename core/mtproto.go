@@ -16,12 +16,14 @@ type MTProtoManager interface {
 	SendMessageToUsername(username string, message string) (err error)
 	SendMessage(user UserDialog, message string) (err error)
 	GetUnreadedDialogs() ([]UserDialog, error)
+	Disconnect() error
 }
 
 // UserDialog shows minimal params to send message
 type UserDialog struct {
-	ID         int32
-	AccessHash int64
+	ID            int32
+	AccessHash    int64
+	LastMessageID int32
 }
 
 var (
@@ -57,6 +59,7 @@ func (dmw *defaultMtprotoWrapper) GetUnreadedDialogs() (dialogs []UserDialog, er
 	if err != nil {
 		return
 	}
+
 	dialogs = getUnreaded(resp)
 	return
 }
@@ -66,6 +69,20 @@ func (dmw *defaultMtprotoWrapper) SendMessage(ud UserDialog, msg string) (err er
 		User_id:     ud.ID,
 		Access_hash: ud.AccessHash,
 	}, 0, msg, rand.Int63(), mtproto.TL_null{}, nil)
+	if err != nil {
+		return
+	}
+
+	req := mtproto.TL_messages_readHistory{
+		Peer: mtproto.TL_inputPeerUser{
+			User_id:     ud.ID,
+			Access_hash: ud.AccessHash,
+		},
+		Max_id: ud.LastMessageID,
+	}
+
+	_, err = dmw.MTProto.InvokeSync(req)
+
 	return
 }
 
@@ -116,9 +133,16 @@ func getUnreaded(resp mtproto.TL_messages_dialogsSlice) (res []UserDialog) {
 					continue
 				}
 				//log.Println(msg.Message)
-				res = append(res, UserDialog{ID: peer.User_id, AccessHash: user.Access_hash})
+				res = append(res, UserDialog{ID: peer.User_id,
+					AccessHash:    user.Access_hash,
+					LastMessageID: dia.Top_message,
+				})
 			}
 		}
 	}
 	return
+}
+
+func (dmw *defaultMtprotoWrapper) Disconnect() error {
+	return dmw.MTProto.Disconnect()
 }

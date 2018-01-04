@@ -48,8 +48,10 @@ func New(envFile string, valueKey, notifyURL string) (_ *Core, err error) {
 	}
 
 	username, err := c.CheckToken(currentToken)
+	c.CurrentToken = currentToken
 	c.CurrentBotUsername = username
 	if err != nil {
+		color.Yellow("Last token (%s) invalid, %s", currentToken, err)
 		err = c.GetNewToken()
 		if err != nil {
 			return
@@ -77,6 +79,15 @@ func (c *Core) Run() {
 
 		// handle new messages
 		if c.onMessage != nil {
+			// TODO: hack
+			for {
+				c.Tg.Disconnect()
+				c.Tg, err = NewDefaultMTPRotoWrapper()
+				if err == nil {
+					break
+				}
+			}
+
 			dialogs, err := c.Tg.GetUnreadedDialogs()
 			if err != nil {
 				color.Red("Error getting unread dialogs %s", err)
@@ -143,12 +154,7 @@ func notifyHTTP(uri string) (err error) {
 	return
 }
 
-func getFileValue(filename, key string) (value string, err error) {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return
-	}
-
+func getValue(data []byte, key string) (value string, err error) {
 	reg := fmt.Sprintf(`(%s ?= ?(\S*))`, key)
 	re := regexp.MustCompile(reg)
 	res := re.FindSubmatch(data)
@@ -157,6 +163,14 @@ func getFileValue(filename, key string) (value string, err error) {
 		return
 	}
 	return string(res[2]), nil
+}
+
+func getFileValue(filename, key string) (value string, err error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return
+	}
+	return getValue(data, key)
 }
 
 // replace value in bash varianle definition file
@@ -176,6 +190,7 @@ func replaceFileValue(filename, key, newValue string) (err error) {
 // GetNewToken get token from database, check it
 // repeat it while we can get valid token
 func (c *Core) GetNewToken() (err error) {
+	color.Yellow("Current token invalid %s (%s)", c.CurrentBotUsername, c.CurrentToken)
 	for {
 		token, err := c.Store.PopToken()
 		if err != nil {
