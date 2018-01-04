@@ -1,0 +1,10 @@
+[Unit]
+Description=abudef script
+
+[Service]
+WorkingDirectory=/home/admin/abudef
+ExecStart=/home/admin/abudef/abudef bot
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
